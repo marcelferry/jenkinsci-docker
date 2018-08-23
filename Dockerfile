@@ -1,6 +1,22 @@
 FROM openjdk:8-jdk
 
-RUN apt-get update && apt-get install -y git curl && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y git apt-transport-https software-properties-common curl && rm -rf /var/lib/apt/lists/*
+
+# Add Docker binaries directly
+RUN curl -fsSL https://download.docker.com/linux/debian/gpg | apt-key add -
+RUN add-apt-repository \
+        "deb [arch=amd64] https://download.docker.com/linux/debian \
+        $(lsb_release -cs) \
+        stable"
+RUN apt-get update
+RUN apt-cache policy docker-ce
+RUN apt-get -y install docker-ce=17.06.0~ce-0~debian
+RUN curl -L https://github.com/docker/compose/releases/download/1.15.0/docker-compose-`uname -s`-`uname -m` > /usr/bin/docker-compose && chmod +x /usr/bin/docker-compose
+
+
+ARG docker_port=2375
+EXPOSE ${docker_port}
+COPY dockerd-entrypoint.sh /usr/local/bin/dockerd-entrypoint.sh
 
 ARG user=jenkins
 ARG group=jenkins
@@ -44,10 +60,10 @@ COPY init.groovy /usr/share/jenkins/ref/init.groovy.d/tcp-slave-agent-port.groov
 
 # jenkins version being bundled in this docker image
 ARG JENKINS_VERSION
-ENV JENKINS_VERSION ${JENKINS_VERSION:-2.121.1}
+ENV JENKINS_VERSION ${JENKINS_VERSION:-2.138}
 
 # jenkins.war checksum, download will be validated using it
-ARG JENKINS_SHA=5bb075b81a3929ceada4e960049e37df5f15a1e3cfc9dc24d749858e70b48919
+ARG JENKINS_SHA=e1c280f1241999c9c7795a8ea3e5346debeb6be5e26744c13b03bc494dcef56c
 
 # Can be used to customize where jenkins.war get downloaded from
 ARG JENKINS_URL=https://repo.jenkins-ci.org/public/org/jenkins-ci/main/jenkins-war/${JENKINS_VERSION}/jenkins-war-${JENKINS_VERSION}.war
@@ -69,6 +85,8 @@ EXPOSE ${http_port}
 EXPOSE ${agent_port}
 
 ENV COPY_REFERENCE_FILE_LOG $JENKINS_HOME/copy_reference_file.log
+
+RUN usermod -aG docker ${user}
 
 USER ${user}
 
